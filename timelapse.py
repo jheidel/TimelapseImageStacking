@@ -7,7 +7,7 @@ import sys
 
 parser = argparse.ArgumentParser()
 parser.add_argument('timelapse_dir', help='Path to directory containing timelapse images.')
-parser.add_argument('output_dir', help='Directory for output merged sequence. Will be created.')
+parser.add_argument('output_name', help='Directory for output merged sequence. Will be created in timelapse_dir.')
 parser.add_argument('--darken', action='store_true', help='Enable darken mode.')
 parser.add_argument('--skip', nargs='?', const=1, type=int,
                     help='Use one out of every SKIP images.')
@@ -45,7 +45,7 @@ def WindowMerge(filenames):
         img_out = MergeImages(history_img, img_new, lighten=not args.darken)
       history_img = img_out
 
-    history_img.save(os.path.join(args.output_dir, 'output%05d.jpg' % c),
+    history_img.save(os.path.join(args.timelapse_dir, args.output_name, 'output%05d.jpg' % c),
                      'JPEG', quality=97)
 
 
@@ -60,7 +60,7 @@ def MergeAll(filenames):
       img_new = Image.open(fpath)
       img_out = MergeImages(history_img, img_new, lighten=not args.darken)
     
-    img_out.save(os.path.join(args.output_dir, 'output%05d.jpg' % c),
+    img_out.save(os.path.join(args.timelapse_dir, args.output_name, 'output%05d.jpg' % c),
                  'JPEG', quality=97)
     history_img = img_out
 
@@ -69,7 +69,9 @@ def Main():
   print '*** Super Timelapse Merge Script ***'
   
   filenames = os.listdir(args.timelapse_dir)
+  filenames = filter(lambda x: os.path.isfile(os.path.join(args.timelapse_dir, x)), filenames)
   filenames.sort()
+  print 'Found %d files' % len(filenames)
 
   skip = args.skip or 1
   if skip != 1:
@@ -79,7 +81,7 @@ def Main():
   if args.darken:
     print 'Using darken mode.'
     
-  os.makedirs(args.output_dir)
+  os.makedirs(os.path.join(args.timelapse_dir, args.output_name))
 
   if args.window > 0:
     print 'Using window merge mode.'
