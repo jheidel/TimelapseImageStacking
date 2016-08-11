@@ -11,6 +11,8 @@ parser.add_argument('output_dir', help='Directory for output merged sequence. Wi
 parser.add_argument('--darken', action='store_true', help='Enable darken mode.')
 parser.add_argument('--skip', nargs='?', const=1, type=int,
                     help='Use one out of every SKIP images.')
+parser.add_argument('--window', nargs='?', const=0, type=int,
+                    help='Merge the last N images. 0 to merge all.')
 args = parser.parse_args()
 
 
@@ -25,23 +27,30 @@ def MergeImages(img1, img2, lighten=True):
   return Image.fromarray(ao, mode=img1.mode)
 
 
-def Main():
-  print '*** Super Timelapse Merge Script ***'
-  
-  filenames = os.listdir(args.timelapse_dir)
-  filenames.sort()
-  
-  if args.skip != 1:
-    print 'Filtering list. Using 1 out of every %d images.' % args.skip
-    filenames[:] = filenames[::args.skip]
+def WindowMerge(filenames):
+  def gen_bundles():
+    for i in range(0, len(filenames)):
+      yield filenames[max(0, i-args.window):i]
+  bundles = list(filter(None, gen_bundles()))
 
-  if args.darken:
-    print 'Using darken mode.'
-    
-  os.makedirs(args.output_dir)
-  
+  for c, bundle in enumerate(bundles):
+    print 'Processing %s (%d / %d)' % (bundle, c + 1, len(bundles))
+    history_img = None
+    for fname in bundle:
+      fpath = os.path.join(args.timelapse_dir, fname)
+      if history_img is None:
+        img_out = Image.open(fpath)
+      else:
+        img_new = Image.open(fpath)
+        img_out = MergeImages(history_img, img_new, lighten=not args.darken)
+      history_img = img_out
+
+    history_img.save(os.path.join(args.output_dir, 'output%05d.jpg' % c),
+                     'JPEG', quality=97)
+
+
+def MergeAll(filenames):
   history_img = None
-  
   for c, fname in enumerate(filenames):
     fpath = os.path.join(args.timelapse_dir, fname)
     print 'Processing %s (%d / %d)' % (fpath, c + 1, len(filenames))
@@ -54,6 +63,29 @@ def Main():
     img_out.save(os.path.join(args.output_dir, 'output%05d.jpg' % c),
                  'JPEG', quality=97)
     history_img = img_out
+
+
+def Main():
+  print '*** Super Timelapse Merge Script ***'
+  
+  filenames = os.listdir(args.timelapse_dir)
+  filenames.sort()
+
+  skip = args.skip or 1
+  if skip != 1:
+    print 'Filtering list. Using 1 out of every %d images.' % skip
+    filenames[:] = filenames[::skip]
+
+  if args.darken:
+    print 'Using darken mode.'
+    
+  os.makedirs(args.output_dir)
+
+  if args.window > 0:
+    print 'Using window merge mode.'
+    WindowMerge(filenames)
+  else:
+    MergeAll(filenames)
 
   print 'DONE.'
 
